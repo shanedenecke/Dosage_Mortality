@@ -110,9 +110,30 @@ for (P in unique(Data$Pesticide)){
     Data.sub=subset(Data,Genotype==G & Pesticide==P)
     summary=LD(Data.sub$Dead,Data.sub$Total,Data.sub$modDose,.95)
     emat[paste(P,G,sep="."),]=c(P,G,summary[which(summary[,'p']=="50"),"EC"],summary[which(summary[,'p']=="50"),"LCL"],summary[which(summary[,'p']=="50"),"UCL"])
-    write.csv(summary,file=paste(p,g,"Summary_Table.csv",sep="_"))
   }
 }
+write.csv(emat,file="Lc50_Summary.csv")
+emat1=cbind(emat[,c("Pesticide","Genotype")],as.numeric(emat[,c("LC50","LCL","UCL")]))
+emat[,c("LC50","LCL","UCL")]=as.numeric(emat[,c("LC50","LCL","UCL")])
+control="wxac"
+for (P in unique(Data$Pesticide)){
+  sub=emat[which(grepl(P,rownames(emat))),]
+  RR=as.numeric(sub[which(!grepl(control,rownames(sub))),"LC50"])/as.numeric(sub[which(grepl(control,rownames(sub))),"LC50"])
+  RR.LCL=RR*max(
+    
+    some vector showing % error calcs)
+    as.numeric(sub
+
+
+
+
+
+s=ddply(emat,c("Genotype","Pesticide"),summarise,LC50)
+  
+  aggregate(emat[,c("Lc50"),by=list(Genotype=emat[,"Genotype"],Pesticide=emat[,"Pesticide"]),FUN=emat[,]/emat[,2]
+
+
+
 
 emat[,"Pesticide"
 

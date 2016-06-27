@@ -17,7 +17,6 @@ Data$modDose=(1000*Data$Dose)+1
 conf.level=as.numeric(dlgInput(message="Please Enter What your confidence Interval Should Be (e.g .95 for 95% CI)")$res) 
 LD.level=as.numeric(dlgInput(message="Please Enter What your LD value Should Be (e.g for LD50, write 50")$res)
 
-#a=Sys.Date
 GraphDir=paste(getwd(),"/",Sys.Date(),sep="")
 dir.create(GraphDir)
 setwd(GraphDir)
@@ -29,7 +28,7 @@ plot(sub$Survivors~sub$modDose)
 ### LD50 function
 LD <- function(r, n, d, conf.level) {
 	## Set up a number series 
-#p <- seq(1, 99, 1)
+p=c(25,50,75)
 
 ## r=number responding, n=number treated, d=dose (untransformed), confidence interval level, 
 	mod <- glm(cbind(r, (n-r)) ~ log10(d), family = binomial(link=probit))
@@ -47,10 +46,10 @@ LD <- function(r, n, d, conf.level) {
 	z.value <- summary$coefficients[6]
 	N <- sum(n)
 	
-	## Intercept (alpha)
+	## Intercept and slope (alpha and beta)
 	b0<-intercept
-	## Slope (beta)
 	b1<-slope
+	
 ## Slope variance 
 	vcov = summary(mod)$cov.unscaled
 	var.b0<-vcov[1,1]
@@ -90,20 +89,9 @@ const2a <- var.b0 + 2*cov.b0.b1*theta.hat + var.b1*theta.hat^2 - g*(var.b0 - (co
 	ECtable <- data.frame(
 	  "p"=p,
 	  "N"=N,
-	  "EC"=10^theta.hat,
+	  "EC"=(10^theta.hat),
 	  "LCL"=10^LCL,
-	  "UCL"=10^UCL, 
-	  "slope"=slope, 
-	  "slopeSE"=slopeSE, 
-	  "intercept"=intercept, 
-	  "interceptSE"=interceptSE, 
-	  "z.value"=z.value, 
-	  "chisquare"=deviance(mod), 
-	  "df"=df.residual(mod), 
-	  "h"=het, 
-	  "g"=g,
-	  "theta.hat"=theta.hat,
-	  "var.theta.hat"=var.theta.hat)
+	  "UCL"=10^UCL)
 	
 	## Select output level
 	return(ECtable)
@@ -112,19 +100,21 @@ const2a <- var.b0 + 2*cov.b0.b1*theta.hat + var.b1*theta.hat^2 - g*(var.b0 - (co
 
 
 
-{
+
 emat=matrix(nrow=length(unique(Data$Pesticide))*length(unique(Data$Genotype)),ncol=5)
 colnames(emat)=c("Pesticide","Genotype","LC50","LCL","UCL")
 rownames(emat)=apply(expand.grid(unique(Data$Pesticide), unique(Data$Genotype)), 1, paste, collapse=".")
 
-for (p in unique(Data$Pesticide)){
-  for (g in unique(Data$Genotype)){
-    Data.sub=subset(Data,Genotype==g & Pesticide==p)
+for (P in unique(Data$Pesticide)){
+  for (G in unique(Data$Genotype)){
+    Data.sub=subset(Data,Genotype==G & Pesticide==P)
     summary=LD(Data.sub$Dead,Data.sub$Total,Data.sub$modDose,.95)
-    emat[paste(p,g,sep="."),]=c(p,g,summary[50,"EC"],summary[50,"LCL"],summary[50,"UCL"])
+    emat[paste(P,G,sep="."),]=c(P,G,summary[which(summary[,'p']=="50"),"EC"],summary[which(summary[,'p']=="50"),"LCL"],summary[which(summary[,'p']=="50"),"UCL"])
     write.csv(summary,file=paste(p,g,"Summary_Table.csv",sep="_"))
   }
 }
+
+emat[,"Pesticide"
 
 pt=data.frame(emat)
 pt$LC50=as.numeric(as.character(pt$LC50))
@@ -166,7 +156,7 @@ print(gp)
 dev.off()
 } 
 
-}
+
 
 
 

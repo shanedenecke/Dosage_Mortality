@@ -1,7 +1,7 @@
 ## Import Libraries into R
 library(svDialogs)
 library(ggplot2)
-
+library(extrafont)
 
 ## Import Data into Data Frame
 ## Must have column names Pesticide, Dose, Dead, Treated)
@@ -16,14 +16,13 @@ Data=Data[complete.cases(Data),]
 Data$modDose=(1000*Data$Dose)+1
 conf.level=as.numeric(dlgInput(message="Please Enter What your confidence Interval Should Be (e.g .95 for 95% CI)")$res) 
 LD.level=as.numeric(dlgInput(message="Please Enter What your LD value Should Be (e.g for LD50, write 50")$res)
+control=as.character(dlgInput(message="Please Enter Which Control Line You Are Using")$res)
+
 
 GraphDir=paste(getwd(),"/",Sys.Date(),sep="")
 dir.create(GraphDir)
 setwd(GraphDir)
 
-sub=subset(Data,Pesticide=="Imidacloprid")
-par(mar=c(2,2,2,2),mgp=c(3,1,0),mfrow=c(1,1),xpd=TRUE)
-plot(sub$Survivors~sub$modDose)
 
 ### LD50 function
 LD <- function(r, n, d, conf.level) {
@@ -113,9 +112,13 @@ for (P in unique(Data$Pesticide)){
   }
 }
 write.csv(emat,file="Lc50_Summary.csv")
-emat1=cbind(emat[,c("Pesticide","Genotype")],as.numeric(emat[,c("LC50","LCL","UCL")]))
-emat[,c("LC50","LCL","UCL")]=as.numeric(emat[,c("LC50","LCL","UCL")])
-control="wxac"
+
+
+
+### Plot Resistance Ratios for All insecticides. Not quite working yet
+{
+dir.create(file.path(getwd(),"Resistace_Ratio_Graphs"))
+setwd(file.path(getwd(),"Resistace_Ratio_Graphs"))
 RR.df=data.frame()
 
 for (P in unique(Data$Pesticide)){
@@ -130,16 +133,29 @@ for (P in unique(Data$Pesticide)){
 }
 colnames(RR.df)=c("RR","LCL","UCL")
 rownames(RR.df)=as.character(unique(Data$Pesticide))
-RR.df$Genotype=rownames(RR.df)
+RR.df$Pesticide=rownames(RR.df)
 
-RR.df=subset(RR.df,Genotype!="Pyripole")
+RR.df=subset(RR.df,Pesticide!="Pyripole")
+RR.df=arrange(RR.df,RR)
+RR.df$Pesticide=factor(RR.df$Pesticide,levels=unique(RR.df$Pesticide))
+RR.plot.color=colorRampPalette(c("orangered1","steelblue1"))(length(RR.df$Pesticide))
 
-RRplot=ggplot(RR.df,aes(x=Genotype,y=RR))
+pdf(file="Resistance_Ratio_Graph.pdf")
+RRplot=ggplot(RR.df,aes(x=Pesticide,y=RR,fill=Pesticide))
 RRplot=RRplot+geom_bar(stat="identity",position="dodge")
 RRplot=RRplot+geom_errorbar(aes(ymin=LCL,ymax=UCL))
-RRplot=RRplot+ylim(0,1.5)
-RRplot
-
+RRplot=RRplot+ylim(c(0,1.2))
+RRplot=RRplot+theme(text=element_text(size=18,family="Arial Narrow",face="bold"),
+      axis.text.x=element_text(angle = 60, hjust = 1,size=14),
+      axis.text.y=element_text(size=14,family="",face="bold"),
+      panel.background=element_rect(fill="grey95"),
+      panel.border=element_rect(colour="black",fill=NA),
+      panel.grid.minor=element_blank(),panel.grid.major.x=element_blank(),legend.position="none")
+RRplot=RRplot+scale_fill_manual(RR.plot.color)
+RRplot=RRplot+geom_hline(yintercept=1,linetype=2)
+print(RRplot)
+dev.off()
+}
 
 
 barplot(RR.df$RR,ylim=c(0,1))

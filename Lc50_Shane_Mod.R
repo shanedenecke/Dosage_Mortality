@@ -116,26 +116,35 @@ write.csv(emat,file="Lc50_Summary.csv")
 emat1=cbind(emat[,c("Pesticide","Genotype")],as.numeric(emat[,c("LC50","LCL","UCL")]))
 emat[,c("LC50","LCL","UCL")]=as.numeric(emat[,c("LC50","LCL","UCL")])
 control="wxac"
+RR.df=data.frame()
+
 for (P in unique(Data$Pesticide)){
+  
   sub=emat[which(grepl(P,rownames(emat))),]
   RR=as.numeric(sub[which(!grepl(control,rownames(sub))),"LC50"])/as.numeric(sub[which(grepl(control,rownames(sub))),"LC50"])
-  RR.LCL=RR*max(
-    
-    some vector showing % error calcs)
-    as.numeric(sub
-
-
-
-
-
-s=ddply(emat,c("Genotype","Pesticide"),summarise,LC50)
+  RR.LCL=RR-RR*max(as.numeric(sub[1,"LCL"])/as.numeric(sub[1,"LC50"]),as.numeric(sub[2,"LCL"])/as.numeric(sub[2,"LC50"])) ## I'm pretty sure this calculation is dodgy as fuck
+  RR.UCL=RR+RR*max(as.numeric(sub[1,"UCL"])/as.numeric(sub[1,"LC50"]),as.numeric(sub[2,"UCL"])/as.numeric(sub[2,"LC50"])) ## I'm pretty sure this calculation is dodgy as fuck
+  RRs=c(RR,RR.LCL,RR.UCL)
+  RR.df=rbind(RR.df,RRs)
   
-  aggregate(emat[,c("Lc50"),by=list(Genotype=emat[,"Genotype"],Pesticide=emat[,"Pesticide"]),FUN=emat[,]/emat[,2]
+}
+colnames(RR.df)=c("RR","LCL","UCL")
+rownames(RR.df)=as.character(unique(Data$Pesticide))
+RR.df$Genotype=rownames(RR.df)
+
+RR.df=subset(RR.df,Genotype!="Pyripole")
+
+RRplot=ggplot(RR.df,aes(x=Genotype,y=RR))
+RRplot=RRplot+geom_bar(stat="identity",position="dodge")
+RRplot=RRplot+geom_errorbar(aes(ymin=LCL,ymax=UCL))
+RRplot=RRplot+ylim(0,1.5)
+RRplot
 
 
 
+barplot(RR.df$RR,ylim=c(0,1))
 
-emat[,"Pesticide"
+emat[,"Pesticide"]
 
 pt=data.frame(emat)
 pt$LC50=as.numeric(as.character(pt$LC50))

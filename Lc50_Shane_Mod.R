@@ -2,6 +2,7 @@
 library(svDialogs)
 library(ggplot2)
 library(extrafont)
+options(warn=0)
 
 ## Import Data into Data Frame
 ## Must have column names Pesticide, Dose, Dead, Treated)
@@ -99,7 +100,8 @@ const2a <- var.b0 + 2*cov.b0.b1*theta.hat + var.b1*theta.hat^2 - g*(var.b0 - (co
 
 
 
-
+## Clean Data a bit
+{
 emat=matrix(nrow=length(unique(Data$Pesticide))*length(unique(Data$Genotype)),ncol=5)
 colnames(emat)=c("Pesticide","Genotype","LC50","LCL","UCL")
 rownames(emat)=apply(expand.grid(unique(Data$Pesticide), unique(Data$Genotype)), 1, paste, collapse=".")
@@ -112,8 +114,11 @@ for (P in unique(Data$Pesticide)){
   }
 }
 write.csv(emat,file="Lc50_Summary.csv")
-
-
+lc.df=data.frame(emat)
+lc.df$LC50=as.numeric(as.character(lc.df$LC50))
+lc.df$LCL=as.numeric(as.character(lc.df$LCL))
+lc.df$UCL=as.numeric(as.character(lc.df$UCL))
+}
 
 ### Plot Resistance Ratios for All insecticides. Not quite working yet
 {
@@ -151,31 +156,74 @@ RRplot=RRplot+theme(text=element_text(size=18,family="Arial Narrow",face="bold")
       panel.background=element_rect(fill="grey95"),
       panel.border=element_rect(colour="black",fill=NA),
       panel.grid.minor=element_blank(),panel.grid.major.x=element_blank(),legend.position="none")
-RRplot=RRplot+scale_fill_manual(RR.plot.color)
+RRplot=RRplot+scale_fill_manual(values=RR.plot.color)
 RRplot=RRplot+geom_hline(yintercept=1,linetype=2)
 print(RRplot)
 dev.off()
 }
 
 
-barplot(RR.df$RR,ylim=c(0,1))
+##LC50 Comparisons in ggplot2
+{
 
-emat[,"Pesticide"]
+for (P in unique(lc.df$Pesticide)){ 
 
-pt=data.frame(emat)
-pt$LC50=as.numeric(as.character(pt$LC50))
-pt$LCL=as.numeric(as.character(pt$LCL))
-pt$UCL=as.numeric(as.character(pt$UCL))
+sub.lc=subset(lc.df,Pesticide==P)
 
-write.csv(pt,file="Overall_LC50_Summary.csv")
-for (p in unique(emat[,"Pesticide"])){ 
-sub.pt=subset(pt,Pesticide==p)
-attach(sub.pt)
-pdf(file=paste(p,"LC50_barplot.pdf",sep="_"),width=10)
+#pdf(file=paste(p,"LC_50_Comparison.pdf",sep="_"),width=10) 
+lc.plot=ggplot(data=sub.lc,aes(x=Genotype,y=LC50,fill=Genotype)) 
+lc.plot=lc.plot+geom_bar(stat="identity",position="dodge")
+lc.plot=lc.plot+geom_errorbar(aes(ymin=LCL,ymax=UCL))
+lc.plot=lc.plot+ylim(c(0,max(as.numeric(sub.lc$LC50)*1.5)))
+lc.plot=lc.plot+theme(text=element_text(size=18,family="Arial Narrow",face="bold"),
+      axis.text.x=element_text(angle = 60, hjust = 1,size=14),
+      axis.text.y=element_text(size=14,family="",face="bold"),
+      panel.background=element_rect(fill="grey95"),
+      panel.border=element_rect(colour="black",fill=NA),
+      panel.grid.minor=element_blank(),panel.grid.major.x=element_blank(),legend.position="none")
+lc.plot=lc.plot+scale_fill_manual(values=c("orange","black"))
+print(lc.plot)
+}
+}
 
-par(mar=c(6,6,3,3),mgp=c(3.2,1,0),mfrow=c(1,1))
-bp=barplot(LC50,col=c("blue","red"),ylim=c(0,3+max(UCL)),family="serif", 
-ylab=list("LC50 Value (ppb)",font=2,cex=1.8),main=paste(p),cex.main=2,axes=F,las=2)
+
+
+
+
+
+### Individual Dose response in ggplot
+for (P in as.character(unique(Data$Pesticide))){
+
+sub.Data=subset(Data,Pesticide==P) 
+#pdf(file=paste(p,"Dose_Response.pdf",sep="_"),width=10) 
+gp=ggplot(data=sub.Data,aes(x=Dose,y=Survivors,group=interaction(Dose,Genotype)))
+gp=gp+geom_dotplot(aes(fill=Genotype),binaxis='y',stackdir="center", binwidth=1,colour="black",dotsize=1,position="dodge")
+gp=gp+ggtitle(P) 
+gp=gp+ stat_summary(aes(colour=Genotype),fun.data = mean_cl_normal, geom = "crossbar",position=position_dodge()) 
+gp=gp+theme(text=element_text(size=18,family="Arial Narrow",face="bold"),
+      axis.text.x=element_text(angle = 60, hjust = 1,size=14),
+      axis.text.y=element_text(size=14,family="",face="bold"),
+      panel.background=element_rect(fill="grey95"),
+      panel.border=element_rect(colour="black",fill=NA),
+      panel.grid.minor=element_blank(),panel.grid.major.x=element_blank(),legend.position="none")
+#gp=gp+
+print(gp)
+
+#dev.off()
+} 
+
+
+
+
+
+### Base Plot Graphs for LC50 comparisons
+{{
+attach(sub.lc,warn.conflicts=FALSE)
+pdf(file=paste(P,"LC50_barplot.pdf",sep="_"),width=10)
+
+par(mar=c(2,2,2,2),mgp=c(3.2,1,0),mfrow=c(1,1))
+bp=barplot(LC50,col=c("blue","red"),ylim=c(0,max(LC50)+.4*max(LC50)),family="serif", 
+ylab=list("LC50 Value (ppb)",font=2,cex=1.8),main=paste(P),cex.main=2,axes=F,las=2)
 segments(bp,LC50, bp,UCL,col="black",lwd=2)
 segments(x0=bp-.3, y0=UCL,x1=bp+.3,lwd=2,col="black")
 segments(bp,LC50, bp,UCL,col="black",lwd=2)
@@ -185,30 +233,7 @@ text(x=bp-.1,y=par("usr")[3]-2,srt = 0, xpd = TRUE,adj=0,labels =paste(unique(Ge
 mtext(side=1,at=median(bp)-.1, text="Genotype",font=2,cex=2.5,line=3,family="serif")
 
 dev.off()
-}
-
-
-for (p in as.character(unique(Data$Pesticide))){
-
-sub.Data=subset(Data,Pesticide==p) 
-pdf(file=paste(p,"Dose_Response.pdf",sep="_"),width=10) 
-gp=ggplot(data=sub.Data,aes(Dose,Survivors,fill=Genotype)) 
-#gp=gp+geom_bar(stat="identity", position = "dodge")
-gp=gp+ggtitle(p) 
-gp=gp+ stat_summary(fun.data = mean_cl_normal, geom = "errorbar",position=position_dodge()) 
-gp=gp+stat_summary(fun.y=mean,position=position_dodge(),geom="bar") 
-print(gp)
-
-dev.off()
-} 
-
-
-
-
-
-p <- ggplot(mtcars, aes(wt, mpg))
-p <- p + geom_point()
-print(p)
-
+detach(sub.lc)
+}}
 
 

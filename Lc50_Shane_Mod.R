@@ -2,7 +2,7 @@
 library(svDialogs)
 library(ggplot2)
 library(extrafont)
-options(warn=0)
+
 
 ## Import Data into Data Frame
 ## Must have column names Pesticide, Dose, Dead, Treated)
@@ -12,11 +12,45 @@ setwd(mainDir)
 Data=read.csv(File_Name,header=T)
 Data=Data[complete.cases(Data),]
 
+### Failed (so far) Abbots correction script
+{
 
+
+
+for (P in Data$Pesticide)
+  pest.sub=subset(Data,Pesticide==P)
+  #cor.data=matrix(ncol=7,nrow=length(unique(pest.sub$Dose))*length(unique(pest.sub$Genotype)))
+  #assign(paste("cor.data",P,sep="."),cor.data)
+  for (G in Data$Genotye){
+    gen.sub=subset(pest.sub,Genotype==G)
+      for (D in Data$Dose){
+        dose.sub=subset(gen.sub,Dose==0 | Dose==D)
+      sum=ddply(dose.sub,c("Dose"),summarise,
+            m=mean(Fraction.Mortality),
+            n=length(Fraction.Mortality),
+            v=var(Fraction.Mortality))
+      t.value=qt(.95,min(sum$n)-1)
+      g.value=sum[which(sum$Dose==0),"v"]*(t.value^2)/(((1-sum[which(sum$Dose==0),"m"])^2)*sum[which(sum$Dose==0),"n"])
+      p.corr.mort=1-((1-sum[which(sum$Dose==D),"m"])/((1-sum[which(sum$Dose==0),"m"])/(1-g.value)))
+      c.i= ((((1-g.value) * (sum[which(sum$Dose==D),"v"]/sum[which(sum$Dose==0),"n"])) + ((((1-sum[which(sum$Dose==D),"m"])^2) * sum[which(sum$Dose==0),"n"])))^.5) * (t.value/((1-sum[which(sum$Dose==0),"m"])/ (1-g)))
+      
+      
+      output[rows,] <- c(j, i, experiment.count, experiment.mean, experiment.var, p.corr.mort, c.i)
+   
+        
+      control.sub=subset(Data,Dose==0 & Genotype==G)
+      control.sub.mort=control.sub$Fraction.Mortality
+      control.sub.count=length(control.sub.mort)
+      control.sub.count=length(control.sub.mort)
+      }
+  }
+}
+    
+    
 ## Calculate log dose
 Data$modDose=(1000*Data$Dose)+1
 conf.level=as.numeric(dlgInput(message="Please Enter What your confidence Interval Should Be (e.g .95 for 95% CI)")$res) 
-LD.level=as.numeric(dlgInput(message="Please Enter What your LD value Should Be (e.g for LD50, write 50")$res)
+LD.level=as.numeric(unlist(strsplit(as.character(dlgInput(message="Please Enter What your LD value Should Be (e.g for LD50, write 50")$res),split=",")))
 control=as.character(dlgInput(message="Please Enter Which Control Line You Are Using")$res)
 
 
@@ -24,11 +58,23 @@ GraphDir=paste(getwd(),"/",Sys.Date(),sep="")
 dir.create(GraphDir)
 setwd(GraphDir)
 
+prob=glm(cbind(Dead,Total-Dead)~log10(modDose)+Genotype,family=binomial(link="probit"),data=sub.Pesticide)
+wald.test(b=coef(prob), Sigma=vcov(prob), Terms=4:5)
 
-### LD50 function
+sub.Data=subset(Data,Genotype==G & Pesticide==P)
+prob=glm(cbind(Dead,Total-Dead)~log10(modDose),family=binomial(link="probit"),data=sub.Data)
+prob.sum=summary(prob,dispersion=het,cor=F)
+p=seq(1,99,1)
+eta = family(prob)$linkfun(p/100)  #probit distribution curve
+b0=prob.sum$coefficients[1]
+b1=prob.sum$coefficients[2]
+theta.hat=(eta - b0)/b1
+l50=((10^(dist-b0)/b1)/1000)-1
+
+### LD50 function from Paper
 LD <- function(r, n, d, conf.level) {
 	## Set up a number series 
-p=c(25,50,75)
+p=LD.level
 
 ## r=number responding, n=number treated, d=dose (untransformed), confidence interval level, 
 	mod <- glm(cbind(r, (n-r)) ~ log10(d), family = binomial(link=probit))
@@ -97,66 +143,81 @@ const2a <- var.b0 + 2*cov.b0.b1*theta.hat + var.b1*theta.hat^2 - g*(var.b0 - (co
 	return(ECtable)
 }
 
+sd.lc=function(df,LD.level){
+  prob=glm(cbind(Dead,Total-Dead)~log10(modDose),family=binomial(link="probit"),data=df)
+  prob.sum=summary(prob)
+  dist=family(prob)$linkfun(LD.level/100)
+  b0=prob.sum$coefficients[1]
+  b1=prob.sum$coefficients[2]
+  theta.hat=10^(dist-b0)/b1
+  lc.table=((10^(dist-b0)/b1)-1)/1000
+  ll.table=10^dist-confint(prob)[1,1]/confint(prob)[2,1]-1/1000
+  
+  return(lc.table)
+}
+  
+  
 
 
 
-## Clean Data a bit
+
+## Calculate LC50 values (lc.df) and resistance ratios (RR.df)
 {
-emat=matrix(nrow=length(unique(Data$Pesticide))*length(unique(Data$Genotype)),ncol=5)
-colnames(emat)=c("Pesticide","Genotype","LC50","LCL","UCL")
-rownames(emat)=apply(expand.grid(unique(Data$Pesticide), unique(Data$Genotype)), 1, paste, collapse=".")
+
+lc.mat=matrix(nrow=length(unique(Data$Pesticide))*length(unique(Data$Genotype)),ncol=5)
+colnames(lc.mat)=c("Pesticide","Genotype","LC50","LCL","UCL")
+rownames(lc.mat)=apply(expand.grid(unique(Data$Pesticide), unique(Data$Genotype)), 1, paste, collapse=".")
 
 for (P in unique(Data$Pesticide)){
   for (G in unique(Data$Genotype)){
     Data.sub=subset(Data,Genotype==G & Pesticide==P)
-    summary=LD(Data.sub$Dead,Data.sub$Total,Data.sub$modDose,.95)
-    emat[paste(P,G,sep="."),]=c(P,G,summary[which(summary[,'p']=="50"),"EC"],summary[which(summary[,'p']=="50"),"LCL"],summary[which(summary[,'p']=="50"),"UCL"])
+    summary.ld=LD(Data.sub$Dead,Data.sub$Total,Data.sub$modDose,.95)
+    lc.mat[paste(P,G,sep="."),]=c(P,G,summary.ld[which(summary.ld[,'p']=="50"),"EC"],summary.ld[which(summary.ld[,'p']=="50"),"LCL"],summary.ld[which(summary.ld[,'p']=="50"),"UCL"])
   }
 }
-write.csv(emat,file="Lc50_Summary.csv")
-lc.df=data.frame(emat)
+lc.df=data.frame(lc.mat)
 lc.df$LC50=as.numeric(as.character(lc.df$LC50))
 lc.df$LCL=as.numeric(as.character(lc.df$LCL))
 lc.df$UCL=as.numeric(as.character(lc.df$UCL))
+write.csv(lc.df,file="Lc50_Summary.csv")
+dir.create(file.path(getwd(),"Resistace_Ratio_Graphs"))
+setwd(file.path(getwd(),"Resistace_Ratio_Graphs"))
+RR.df=data.frame()
+lc.df=arrange(lc.df,Pesticide)
+for (P in unique(lc.df$Pesticide)){
+  lc.sub=subset(lc.df, Pesticide==P)  
+  for (G in unique(lc.df$Genotype)){  
+  RR=lc.sub$LC50[which(lc.sub$Genotype==G)]/lc.sub$LC50[which(lc.sub$Genotype==control)]
+  RR.LCL=RR*min(lc.sub$LCL[which(lc.sub$Genotype==G)]/lc.sub$LC50[which(lc.sub$Genotype==G)],lc.sub$LCL[which(lc.sub$Genotype==control)]/lc.sub$LC50[which(lc.sub$Genotype==control)])
+  RR.UCL=RR*max(lc.sub$UCL[which(lc.sub$Genotype==G)]/lc.sub$LC50[which(lc.sub$Genotype==G)],lc.sub$UCL[which(lc.sub$Genotype==control)]/lc.sub$LC50[which(lc.sub$Genotype==control)])
+  RRs=c(RR,RR.LCL,RR.UCL) 
+  RR.df=rbind(RR.df,RRs)
+}} 
+colnames(RR.df)=c("RR","RR.LCL","RR.UCL")
+
+sum.df=cbind(lc.df,RR.df)
+
+
 }
 
 ### Plot Resistance Ratios for All insecticides. Not quite working yet
 {
-dir.create(file.path(getwd(),"Resistace_Ratio_Graphs"))
-setwd(file.path(getwd(),"Resistace_Ratio_Graphs"))
-RR.df=data.frame()
 
-for (P in unique(Data$Pesticide)){
-  
-  sub=emat[which(grepl(P,rownames(emat))),]
-  RR=as.numeric(sub[which(!grepl(control,rownames(sub))),"LC50"])/as.numeric(sub[which(grepl(control,rownames(sub))),"LC50"])
-  RR.LCL=RR-RR*max(as.numeric(sub[1,"LCL"])/as.numeric(sub[1,"LC50"]),as.numeric(sub[2,"LCL"])/as.numeric(sub[2,"LC50"])) ## I'm pretty sure this calculation is dodgy as fuck
-  RR.UCL=RR+RR*max(as.numeric(sub[1,"UCL"])/as.numeric(sub[1,"LC50"]),as.numeric(sub[2,"UCL"])/as.numeric(sub[2,"LC50"])) ## I'm pretty sure this calculation is dodgy as fuck
-  RRs=c(RR,RR.LCL,RR.UCL)
-  RR.df=rbind(RR.df,RRs)
-  
-}
-colnames(RR.df)=c("RR","LCL","UCL")
-rownames(RR.df)=as.character(unique(Data$Pesticide))
-RR.df$Pesticide=rownames(RR.df)
-
-RR.df=subset(RR.df,Pesticide!="Pyripole")
-RR.df=arrange(RR.df,RR)
-RR.df$Pesticide=factor(RR.df$Pesticide,levels=unique(RR.df$Pesticide))
-RR.plot.color=colorRampPalette(c("orangered1","steelblue1"))(length(RR.df$Pesticide))
+RR.plot.df=arrange(sum.df,RR)
+RR.plot.df$Pesticide=factor(RR.plot.df$Pesticide,levels=unique(RR.plot.df$Pesticide))
+RR.plot.color=colorRampPalette(c("orangered1","steelblue1"))(length(RR.plot.df$Pesticide))
 
 pdf(file="Resistance_Ratio_Graph.pdf")
-RRplot=ggplot(RR.df,aes(x=Pesticide,y=RR,fill=Pesticide))
+RRplot=ggplot(RR.plot.df,aes(x=Pesticide,y=RR,fill=Genotype))
 RRplot=RRplot+geom_bar(stat="identity",position="dodge")
-RRplot=RRplot+geom_errorbar(aes(ymin=LCL,ymax=UCL))
-RRplot=RRplot+ylim(c(0,1.2))
-RRplot=RRplot+theme(text=element_text(size=18,family="Arial Narrow",face="bold"),
+RRplot=RRplot+geom_errorbar(aes(ymin=RR.LCL,ymax=RR.UCL),position="dodge",stat="identity")
+RRplot=RRplot+ylim(c(0,RR.UCL*1.5))
+RRplot=RRplot+theme(text=element_text(size=18,face="bold"),
       axis.text.x=element_text(angle = 60, hjust = 1,size=14),
       axis.text.y=element_text(size=14,family="",face="bold"),
       panel.background=element_rect(fill="grey95"),
       panel.border=element_rect(colour="black",fill=NA),
-      panel.grid.minor=element_blank(),panel.grid.major.x=element_blank(),legend.position="none")
-RRplot=RRplot+scale_fill_manual(values=RR.plot.color)
+      panel.grid.minor=element_blank(),panel.grid.major.x=element_blank())
 RRplot=RRplot+geom_hline(yintercept=1,linetype=2)
 print(RRplot)
 dev.off()

@@ -1,0 +1,44 @@
+abbotts.cor <- function(filename, significance, saveas) {
+  data <- read.csv(filename)
+  frame <- data.frame(data)
+  genotypes <- unique(frame[["Genotype"]])
+  doses <- unique(frame[["Dose"]])
+  output.names <- c("Genotype", "Dose (ppm)", "Samples", "Mean", "Variance", "Corrected Mortality", "C.I.")
+  iterations <- length(doses) * length(genotypes)
+  variables <- length(output.names)
+  output <- matrix(ncol=variables, nrow=iterations)
+  rows <- 0
+  next.genotype <- 0
+  for (j in genotypes) {
+    next.genotype <- next.genotype + 1 - 1
+    #Put in loop for each dose
+    for (i in doses) {
+      rows <- rows + 1 + (5 * next.genotype)
+      #Control samples mean and variance
+      control <- subset(frame, Genotype==j)
+      control.0 <- subset(control, Dose==0)
+      control.0.mort <- control.0[['Fraction.Mortality']]
+      control.count <- length(control.0.mort) 
+      control.mean <- mean(control.0.mort)
+      control.var <- var(control.0.mort)
+      #Experiment samples mean and variance
+      experiment <- subset(frame, Genotype==j)
+      experiment.dose <- subset(experiment, Dose==i) #Each dose variable from loop
+      experiment.dose.mort <- experiment.dose[['Fraction.Mortality']]
+      experiment.count <- length(experiment.dose.mort) 
+      experiment.mean <- mean(experiment.dose.mort)
+      experiment.var <- var(experiment.dose.mort)
+      #Statistical magic values
+      min.samples <- min(control.count,experiment.count)
+      dof <- min.samples - 1 #degrees of freedom
+      t.value <- qt(significance, dof)
+      g <- (control.var * (t.value^2))/(((1-control.mean)^2) * control.count)
+      p.corr.mort <- 1 - ((1-experiment.mean)/((1-control.mean)/(1-g)))
+      c.i <- ((((1-g) * (experiment.var/experiment.count)) + ((((1-experiment.mean)^2) * control.var) / (((1-control.mean)^2) * control.count)))^0.5) * (t.value/((1-control.mean) / (1-g)))
+      output[rows,] <- c(j, i, experiment.count, experiment.mean, experiment.var, p.corr.mort, c.i)
+    }
+  }
+  output <- data.frame(output)
+  names(output) <- output.names
+write.csv(output, saveas)
+}

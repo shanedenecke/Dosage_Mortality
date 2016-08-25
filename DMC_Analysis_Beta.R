@@ -5,14 +5,17 @@ library(extrafont)
 loadfonts()
 
 ## Import Data into Data Frame
-## Must have column names Pesticide, Dose, Dead, Treated)
-File_Name=file.choose()
-mainDir=dirname(File_Name)
+## Must be formated with columns Pesticide, Genotype rep, Dose, Alive, Dead, Total, 
+## Optional column names Life_Stage, Date, Conditions
+## Example formatted file can be found by unhashtaging the next two lines
+##write.csv(url("******"),file="example_formatted_file.csv")
+##head(read.csv("example_formatted_file.csv")
+
+File_Name <- file.choose()
+mainDir <- dirname(File_Name)
 setwd(mainDir)
-raw.Data=read.csv(File_Name,header=T)
-raw.Data=raw.Data[complete.cases(raw.Data),]
-
-
+raw.Data <- read.csv(File_Name,header=T)
+raw.Data <- raw.Data[complete.cases(raw.Data),]
 GraphDir=paste(getwd(),"/",Sys.Date(),sep="")
 dir.create(GraphDir)
 setwd(GraphDir)

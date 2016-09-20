@@ -16,11 +16,10 @@ mainDir <- dirname(File_Name)
 setwd(mainDir)
 raw.Data <- read.csv(File_Name,header=T)
 raw.Data <- raw.Data[complete.cases(raw.Data),]
-GraphDir=paste(getwd(),"/",Sys.Date(),sep="")
+GraphDir=paste(getwd(),"/",format(Sys.Date(),format="%d %b %y"),sep="")
 dir.create(GraphDir)
 setwd(GraphDir)
  
-
 
 ### Add Control treatments to each insecticide
 Data <- data.frame()
@@ -54,7 +53,7 @@ for (P in as.character(unique(raw.Data$Pesticide))){
 Data$modDose=(1000*Data$Dose)+1
 conf.level=.95#as.numeric(dlgInput(message="Please Enter What your confidence Interval Should Be (e.g .95 for 95% CI)")$res) 
 LD.level=50#as.numeric(unlist(strsplit(as.character(dlgInput(message="Please Enter What your LD value Should Be (e.g for LD50, write 50")$res),split=",")))
-control=as.character(dlgInput(message="Please Enter Which Control Line You Are Using")$res)
+nm=as.character(dlgInput(message="Please Enter A unique name")$res)
 }
 
     ## LD50 function from paper
@@ -161,7 +160,7 @@ for (P in as.character(unique(Data$Pesticide))){
     
     sub.Data$Dose <- as.factor(as.character(sub.Data$Dose))
     
-    pdf(file=paste(P,"Dose_Response.pdf",sep="_"),width=10) 
+    pdf(file=paste(P,nm,"Dose_Response.pdf",sep="_"),width=10) 
     gp=ggplot(data=sub.Data,aes(x=Dose,y=Alive,group=interaction(Dose,Genotype)))
     gp=gp+geom_dotplot(aes(fill=Genotype),binaxis='y',stackdir="center", binwidth=.1,colour="black",position=position_dodge(width=.5),dotsize = 10)
     gp=gp+ggtitle(paste("Individual Vial Response for",P,sep=" ")) 
@@ -169,7 +168,7 @@ for (P in as.character(unique(Data$Pesticide))){
     gp=gp+ylab("Number Emerging\n")
     gp=gp+xlab("\nDose (ppm)")
     gp=gp+stat_summary(fun.y="mean",fun.ymax="mean",fun.ymin="mean", geom="crossbar",colour='black',position=position_dodge(width=.5),width=.5)
-    gp=gp+scale_y_continuous(limits=c(0,max(as.numeric(sub.Data$Alive)))
+    gp=gp+scale_y_continuous(limits=c(0,max(as.numeric(sub.Data$Alive))))
     gp=gp+scale_x_discrete(breaks=as.factor(sub.Data$Dose))
     
     gp=gp+theme(text=element_text(size=18 ,face="bold"),
@@ -224,7 +223,7 @@ for (P in as.character(unique(Data$Pesticide))){
           write.csv(sum.data,file=paste(P,"Corrected_Data.csv",sep="_"))
         sum.data$Dose <- as.factor(as.character(sum.data$Dose)) 
             ## Plot Abbots Correction 
-        pdf(file=paste(P,"Abbots_Correction.pdf",sep="_"),width=10) 
+        pdf(file=paste(P,nm,"Abbots_Correction.pdf",sep="_"),width=10) 
         gp=ggplot(data=sum.data,aes(x=Dose,y=Corrected.Survival,group=interaction(Dose,Genotype)))
         gp=gp+geom_errorbar(aes(ymin=Corrected.Survival,ymax=Corrected.Survival-CI),position=position_dodge(width=.5),stat="identity",width=.5)   
         gp=gp+geom_bar(aes(fill=Genotype),position=position_dodge(width=.5),stat="identity",colour="black",width=.5)

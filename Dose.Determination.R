@@ -18,7 +18,7 @@ gm2=function(min,max){
   return(c)
    }
    
-dd <- function(min,max,Lc50){
+dd <- function(min,max,Lc50=mean(c(min,max))){
     b <- c(min,mean(c(min,Lc50)),Lc50,mean(c(max,Lc50)),max)
     return(b)
 }
